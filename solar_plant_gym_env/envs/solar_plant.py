@@ -124,27 +124,35 @@ class SolarPlant(gym.Env):
             discharge_power = 0  # No discharge
             charge_power = 0  # No charge
         
-        # Calculate total output power (solar + discharge - charge)
+        # Calculate total output power (solar + discharge - charge) ?????????????????????????????????????
         self.total_output_power = solar_power + (discharge_power - charge_power)/(self.time_step/60)
 
         # Calculate reward based on output stability
         power_deviation = (self.total_output_power - self.out_power_const)
         
-        if power_deviation < 0:        
-            reward -= (power_deviation**2) * 0.00002  # Penalize deviation
-        else:
-            reward -= power_deviation * 0.0001  # Penalize deviation
+        # if power_deviation < 0:        
+        #     reward -= (power_deviation**2) * 0.00002  # Penalize deviation
+        # else:
+        #     reward -= power_deviation * 0.0001  # Penalize deviation
         
-        # Penalize battery over-discharge or overcharge
+        # # Penalize battery over-discharge or overcharge
+        # if self.current_battery_charge < self.battry_cap * 0.2:
+        #     reward -= 1  
+        # elif self.current_battery_charge > self.battry_cap * 0.8:
+        #     reward -= 1
+        
         if self.current_battery_charge < self.battry_cap * 0.2:
-            reward -= 1  
+            reward -= ((0.2 * self.battry_cap - self.current_battery_charge) / self.battry_cap)/8
         elif self.current_battery_charge > self.battry_cap * 0.8:
-            reward -= 1
-            
-        if power_deviation < 1000:  # Set a tolerance for "close enough"
-            reward += 200  # Reward for staying close to target output power
+            reward -= ((self.current_battery_charge - 0.8 * self.battry_cap) / self.battry_cap)/8
+        # elif self.current_battery_charge < self.battry_cap * 0.8 and self.current_battery_charge > self.battry_cap * 0.2:
+        #     reward += 0.1
 
-        
+        reward -= (power_deviation**2) * 0.00000002  # Symmetric penalty    
+        if power_deviation < 1000:  # Set a tolerance for "close enough"
+            reward += 2  # Reward for staying close to target output power
+
+        new_row = None
         if self.info_df.empty:
             # If the DataFrame is empty, initialize it with the new row
             self.info_df = pd.DataFrame([{
@@ -189,7 +197,7 @@ class SolarPlant(gym.Env):
             self._render_frame()
 
         # Return observation, reward, done flag, and additional info
-        return observation, reward, done, False , {}
+        return observation, reward, done, False , {'info_df': new_row}
 
     def render(self, mode="ansi"):
         if mode == "ansi":
