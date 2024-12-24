@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 class SolarPlant(gym.Env):
     metadata = {"render_modes": ["ansi", "human"], "render_fps": 4}
     
-    def __init__(self, render_mode=None,epi_days= 1, out_power_const = 5000 , battry_cap = 86000,battrry_charge_rate = 22000 , max_solor_power = 30000 , time_step = 15):    
+    def __init__(self, render_mode=None,epi_days= 1, out_power_const = 5000 , battry_cap = 86000 , battrry_charge_rate = 22000 , max_solor_power = 30000 , time_step = 15,data_file="Vydexa_lanka_data_cleaned.csv"):    
 
         self.out_power_const = out_power_const
         self.battry_cap = battry_cap
@@ -22,6 +22,7 @@ class SolarPlant(gym.Env):
         self.max_solor_power = max_solor_power
         self.time_step = time_step 
         self.epi_days = epi_days
+        self.data_file = data_file
         
         self.info_df = pd.DataFrame(columns=["current_time","current_power","battery_charge","total_output_power","action","reward"])
         self.fig, self.ax = None, None  # Initialize figure and axes for persistent plotting
@@ -60,7 +61,7 @@ class SolarPlant(gym.Env):
     def reset(self , seed= None ,options=None):
         super().reset(seed= seed)
         
-        plant_df = pd.read_csv("Plant_2_Generation_Data_cleaned.csv")
+        plant_df = pd.read_csv(self.data_file)
         num_of_dates = plant_df["DATE"].nunique()
         
         
@@ -111,9 +112,11 @@ class SolarPlant(gym.Env):
                 self.battry_cap - self.current_battery_charge
             )
             self.current_battery_charge += charge_power
+
         elif action == 1:  # Discharge the battery
+            effective_discharge_energy = min(self.battrry_charge_rate, max(0, self.out_power_const - solar_power))*self.time_step/60
             discharge_power = min(
-                self.battrry_charge_rate * self.time_step/60,
+                effective_discharge_energy,
                 self.current_battery_charge
             )
             self.current_battery_charge -= discharge_power
@@ -122,20 +125,25 @@ class SolarPlant(gym.Env):
             charge_power = 0  # No charge
         
         # Calculate total output power (solar + discharge - charge)
-        self.total_output_power = solar_power + (discharge_power - charge_power)/self.time_step*60
+        self.total_output_power = solar_power + (discharge_power - charge_power)/(self.time_step/60)
 
         # Calculate reward based on output stability
-        power_deviation = abs(self.total_output_power - self.out_power_const)
-        reward -= (power_deviation**2) * 0.0002  # Penalize deviation
+        power_deviation = (self.total_output_power - self.out_power_const)
+        
+        if power_deviation < 0:        
+            reward -= (power_deviation**2) * 0.00002  # Penalize deviation
+        else:
+            reward -= power_deviation * 0.0001  # Penalize deviation
         
         # Penalize battery over-discharge or overcharge
         if self.current_battery_charge < self.battry_cap * 0.2:
             reward -= 1  
         elif self.current_battery_charge > self.battry_cap * 0.8:
-            reward -= 1  
+            reward -= 1
             
-        if power_deviation < 100:  # Set a tolerance for "close enough"
-            reward += 100  # Reward for staying close to target output power
+        if power_deviation < 1000:  # Set a tolerance for "close enough"
+            reward += 200  # Reward for staying close to target output power
+
         
         if self.info_df.empty:
             # If the DataFrame is empty, initialize it with the new row
