@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 class SolarPlant(gym.Env):
     metadata = {"render_modes": ["ansi", "human"], "render_fps": 4}
     
-    def __init__(self, render_mode=None,epi_days= 1, out_power_const = 5000 , battry_cap = 86000 , battrry_charge_rate = 22000 , max_solor_power = 30000 , time_step = 15,data_file="Vydexa_lanka_data_cleaned.csv"):    
+    def __init__(self, render_mode=None,epi_days= 1, out_power_const = 5000 , battry_cap = 86000 , battrry_charge_rate = 22000 , max_solor_power = 30000 , time_step = 15,data_frame=None):    
 
         self.out_power_const = out_power_const
         self.battry_cap = battry_cap
@@ -22,7 +22,7 @@ class SolarPlant(gym.Env):
         self.max_solor_power = max_solor_power
         self.time_step = time_step 
         self.epi_days = epi_days
-        self.data_file = data_file
+        self.data_frame = data_frame
         
         self.info_df = pd.DataFrame(columns=["current_time","current_power","battery_charge","total_output_power","action","reward"])
         self.fig, self.ax = None, None  # Initialize figure and axes for persistent plotting
@@ -61,8 +61,9 @@ class SolarPlant(gym.Env):
     def reset(self , seed= None ,options=None):
         super().reset(seed= seed)
         
-        plant_df = pd.read_csv(self.data_file)
-        num_of_dates = plant_df["DATE"].nunique()
+        plant_df = self.data_frame
+        # num_of_dates = plant_df["DATE"].nunique()
+        unique_dates = plant_df["DATE"].unique()
         
         
         # # Get te date as a random date from 0 - num_of_dates
@@ -70,7 +71,10 @@ class SolarPlant(gym.Env):
         
         # self.data_for_epi_date = plant_df[plant_df["DATE"] == episodes_date].reset_index(drop=True)
         # Get multiple random dates as an array of integers
-        random_dates = np.random.randint(0, num_of_dates, size=self.epi_days)  # Replace 10 with the number of random dates you want
+        # random_dates = np.random.randint(0, num_of_dates, size=self.epi_days)  # Replace 10 with the number of random dates you want
+        
+        # get random dates from the unique dates
+        random_dates = np.random.choice(unique_dates, self.epi_days, replace=False)
 
         # Filter the dataframe where the DATE is in the list of random dates
         self.data_for_epi_date = plant_df[plant_df["DATE"].isin(random_dates)].reset_index(drop=True)
